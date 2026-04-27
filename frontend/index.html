@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synthesia Clone</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header>
+            <h1>🎹 Synthesia Clone</h1>
+            <div class="header-controls">
+                <button id="btn-open-file" class="btn btn-primary">
+                    📁 Open File
+                </button>
+                <button id="btn-upload" class="btn btn-primary">
+                    📤 Upload MIDI
+                </button>
+                <button id="btn-channels" class="btn">
+                    🎨 Channels
+                </button>
+                <button id="btn-lighting" class="btn">
+                    💡 Lighting
+                </button>
+                <button id="btn-settings" class="btn">
+                    ⚙️ Settings
+                </button>
+                <button id="btn-share-copy" class="btn" title="Copy link">
+                    🔗 Copy Link
+                </button>
+                <button id="btn-share" class="btn" title="Share this MIDI">
+                    🔗 Share
+                </button>
+                <button id="btn-panic" class="btn" style="background: #d64545;" title="Stop all notes (Hotkey: P)">
+                    ⚠️ STOP ALL NOTES
+                </button>
+                <button id="btn-fullscreen" class="btn">
+                    ⛶ Fullscreen
+                </button>
+            </div>
+        </header>
+        <!-- Progress Bar - ПЕРЕМЕЩЕН НАВЕРХ -->
+        <div id="progress-container">
+            <div id="progress-bar">
+                <div id="progress-fill"></div>
+                <div id="progress-handle"></div>
+            </div>
+            <div id="time-display">
+                <span id="current-time">00:00</span>
+                <span>/</span>
+                <span id="total-time">00:00</span>
+            </div>
+        </div>
+
+        <!-- Main Container -->
+        <div id="main-container">
+            <!-- Canvas for falling notes -->
+            <canvas id="notes-canvas"></canvas>
+
+            <!-- Piano Keyboard -->
+            <div id="keyboard-container">
+                <svg id="piano-keyboard"></svg>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div id="controls">
+            <div class="control-group">
+                <button id="btn-play" class="btn btn-large">
+                    ▶️ Play
+                </button>
+                <button id="btn-pause" class="btn btn-large" disabled>
+                    ⏸️ Pause
+                </button>
+                <button id="btn-stop" class="btn btn-large" disabled>
+                    ⏹️ Stop
+                </button>
+            </div>
+
+            <div class="control-group">
+                <label>Speed:</label>
+                <input type="range" id="speed-slider" min="50" max="400" value="200" step="10">
+                <span id="speed-value">200 px/s</span>
+            </div>
+
+            <div class="control-group">
+                <button id="btn-seek-back" class="btn">
+                    ⏪ -10s
+                </button>
+                <button id="btn-seek-forward" class="btn">
+                    ⏩ +10s
+                </button>
+            </div>
+
+            <div id="status-display">
+                <span id="status-text">Ready</span>
+                <span id="learning-indicator"></span>
+            </div>
+        </div>
+
+        <!-- File Selection Modal -->
+        <div id="file-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Select MIDI File</h2>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="file-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Modal -->
+        <div id="upload-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Upload MIDI File</h2>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="upload-area">
+                        <input type="file" id="file-input" accept=".mid,.midi" hidden>
+                        <button id="btn-select-file" class="btn btn-large btn-primary">
+                            Choose File
+                        </button>
+                        <p>or drag and drop here</p>
+                        <div id="upload-status"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Channel Settings Modal -->
+        <div id="channels-modal" class="modal">
+            <div class="modal-content large">
+                <div class="modal-header">
+                    <h2>Channel Settings</h2>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="channels-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal">
+            <div class="modal-content large">
+                <div class="modal-header">
+                    <h2>Settings</h2>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <!-- Audio Engine Settings -->
+                    <div style="margin-bottom: 30px; padding: 20px; background: #2a3142; border-radius: 8px;">
+                        <h3 style="margin: 0 0 15px 0; color: #fff;">🔊 Audio Playback</h3>
+                        
+                        <div class="setting-item" style="margin-bottom: 15px;">
+                            <label>
+                                <input type="checkbox" id="audio-engine-enable">
+                                Use Internal Audio (Web Audio API)
+                            </label>
+                            <p class="setting-description">
+                                Play notes using built-in piano sounds when no MIDI output is selected
+                            </p>
+                        </div>
+                        
+                        <div id="audio-engine-settings" style="display: none;">
+                            <div style="margin-bottom: 15px;">
+                                <label style="display: block; margin-bottom: 5px;">Volume:</label>
+                                <input type="range" id="audio-volume" min="0" max="100" value="50" 
+                                      style="width: 200px;">
+                                <span id="audio-volume-value">50%</span>
+                            </div>
+                            
+                            <div id="audio-engine-status" style="padding: 10px; background: #1e2433; border-radius: 4px; font-size: 13px;">
+                                <p style="margin: 5px 0;">Status: <span id="audio-status-text">Not initialized</span></p>
+                                <p style="margin: 5px 0;">Samples loaded: <span id="audio-samples-loaded">0</span></p>
+                                <p style="margin: 5px 0;">Active sounds: <span id="audio-active-sounds">0</span></p>
+                            </div>
+                            
+                            <button id="btn-load-audio-samples" class="btn btn-primary" style="margin-top: 10px;">
+                                📥 Load Audio Samples
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- MIDI Devices -->
+                    <h3 style="margin: 0 0 15px 0; color: #fff;">🎹 MIDI Devices</h3>
+                    <div id="midi-outputs-list"></div>
+                    <div id="midi-inputs-list"></div>
+                    
+                    <!-- Settings Management -->
+                    <div style="margin-top: 30px; padding: 20px; background: #2a3142; border-radius: 8px;">
+                        <h3 style="margin: 0 0 15px 0; color: #fff;">Settings Management</h3>
+                        
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
+                            <button id="btn-save-settings" class="btn btn-primary">
+                                💾 Save Settings
+                            </button>
+                            <button id="btn-clear-settings" class="btn" style="background: #d64545;">
+                                🗑️ Clear Settings
+                            </button>
+                            <button id="btn-export-settings" class="btn">
+                                📤 Export
+                            </button>
+                            <button id="btn-import-settings" class="btn">
+                                📥 Import
+                            </button>
+                        </div>
+                        
+                        <input type="file" id="settings-file-input" accept=".json" style="display: none;">
+                        
+                        <p id="settings-last-saved" style="font-size: 12px; color: #a0a8b8; margin: 10px 0 0 0;">
+                            No saved settings
+                        </p>
+                        
+                        <div style="margin-top: 10px; padding: 10px; background: #1e2433; border-radius: 4px;">
+                            <p style="font-size: 12px; color: #a0a8b8; margin: 0;">
+                                <strong>Auto-saved:</strong> MIDI devices, channel colors, scroll speed, lighting settings, audio settings
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding: 15px; background: #2a3142; border-radius: 8px;">
+                        <p style="font-size: 13px; color: #a0a8b8; margin: 0;">
+                            💡 <strong>Tip:</strong> If you don't have a MIDI synthesizer, enable Internal Audio to hear the notes.
+                            The app will automatically download piano samples from the server.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lighting Modal -->
+        <div id="lighting-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Lighting Settings</h2>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="lighting-enabled">
+                            Enable Lighting
+                        </label>
+                        <p class="setting-description">
+                            Light up the keys you need to press in learning mode
+                        </p>
+                    </div>
+                    
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="lighting-all-channels">
+                            Use All Channels
+                        </label>
+                        <p class="setting-description">
+                            Use original MIDI channels for lighting (preserves programs)
+                        </p>
+                    </div>
+                    
+                    <div class="setting-item" id="single-channel-settings">
+                        <h4 style="margin-bottom: 10px;">Single Channel Mode</h4>
+                        <div style="display: flex; gap: 20px; align-items: center; margin-top: 10px;">
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-weight: normal;">Channel:</label>
+                                <input type="number" id="lighting-channel" min="0" max="15" value="0" 
+                                       style="width: 80px; padding: 8px; background: #2a3142; color: #fff; border: 1px solid #3c4354; border-radius: 4px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-weight: normal;">Program:</label>
+                                <input type="number" id="lighting-program" min="0" max="127" value="0"
+                                       style="width: 80px; padding: 8px; background: #2a3142; color: #fff; border: 1px solid #3c4354; border-radius: 4px;">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="lighting-devices-list" style="margin-top: 20px;"></div>
+                    
+                    <div style="margin-top: 20px; padding: 15px; background: #2a3142; border-radius: 8px;">
+                        <p style="font-size: 13px; color: #a0a8b8; margin: 0;">
+                            💡 <strong>Tip:</strong> Connect a MIDI keyboard with LED lights (like Yamaha or Casio with lighting).
+                            The app will light up the keys you need to press in learning mode.
+                        </p>
+                    </div>
+                    
+                    <div style="margin-top: 15px; text-align: center;">
+                        <button id="btn-apply-lighting" class="btn btn-primary" style="padding: 10px 30px;">
+                            Apply
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div id="share-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Share MIDI</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-item">
+                    <label>Share Link</label>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <input type="text" id="share-link-input" readonly 
+                              style="flex: 1; padding: 10px; background: #2a3142; color: #fff; border: 1px solid #3c4354; border-radius: 4px; font-family: monospace; font-size: 12px;">
+                        <button id="btn-copy-link" class="btn btn-primary">
+                            📋 Copy
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="share-autoplay">
+                        Include autoplay
+                    </label>
+                    <p class="setting-description">
+                        The MIDI will start playing automatically when the link is opened
+                    </p>
+                </div>
+                
+                <div class="setting-item">
+                    <label>QR Code</label>
+                    <div id="qr-code-container" style="text-align: center; padding: 20px; background: #fff; border-radius: 8px; margin-top: 10px;">
+                        <canvas id="qr-code-canvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2>MIDI Device Settings</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="midi-outputs-list"></div>
+                <div id="midi-inputs-list"></div>
+                
+                <div style="margin-top: 30px; padding: 20px; background: #2a3142; border-radius: 8px;">
+                    <h3 style="margin: 0 0 15px 0; color: #fff;">Settings Management</h3>
+                    
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
+                        <button id="btn-save-settings" class="btn btn-primary">
+                            💾 Save Settings
+                        </button>
+                        <button id="btn-clear-settings" class="btn" style="background: #d64545;">
+                            🗑️ Clear Settings
+                        </button>
+                        <button id="btn-export-settings" class="btn">
+                            📤 Export
+                        </button>
+                        <button id="btn-import-settings" class="btn">
+                            📥 Import
+                        </button>
+                    </div>
+                    
+                    <input type="file" id="settings-file-input" accept=".json" style="display: none;">
+                    
+                    <p id="settings-last-saved" style="font-size: 12px; color: #a0a8b8; margin: 10px 0 0 0;">
+                        No saved settings
+                    </p>
+                    
+                    <div style="margin-top: 10px; padding: 10px; background: #1e2433; border-radius: 4px;">
+                        <p style="font-size: 12px; color: #a0a8b8; margin: 0;">
+                            <strong>Auto-saved:</strong> MIDI devices, channel colors, scroll speed, lighting settings
+                        </p>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px; padding: 15px; background: #2a3142; border-radius: 8px;">
+                    <p style="font-size: 13px; color: #a0a8b8; margin: 0;">
+                        💡 <strong>Tip:</strong> Settings are automatically saved when you close the app.
+                        MIDI devices are restored by name, so they work even if the device ID changes.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Scripts -->
+    <script src="js/audio-engine.js"></script>
+    <script src="js/settings-manager.js"></script>
+    <script src="js/midi-parser.js"></script>
+    <script src="js/piano.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/controls.js"></script>
+    <script src="js/app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+</body>
+</html>
