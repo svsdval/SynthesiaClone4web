@@ -256,7 +256,7 @@ class AudioEngine {
             if (sound) {
                 try {
                     // Fade out для плавной остановки
-                    const fadeTime = 0.05; // 50ms
+                    const fadeTime = 3.0; // 3сек
                     sound.gain.gain.exponentialRampToValueAtTime(
                         0.001,
                         this.context.currentTime + fadeTime
