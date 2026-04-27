@@ -1253,6 +1253,9 @@ class SynthesiaApp {
         // Очищаем после использования
         this.urlMidiFile = null;
         this.urlAutoplay = false;
+        if (this.useAudioEngine) {
+            this.loadAudioSamplesForCurrentMIDI()
+        }
     }
 
     updateURL(midiPath) {

@@ -31,6 +31,31 @@ class NotesRenderer {
         this.lookaheadTime = visibleHeight / this.scrollSpeed + 1.0;
     }
     
+    drawRoundRect(x, y, width, height, radius, fillColor, strokeColor) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(x + radius, y);
+        this.ctx.lineTo(x + width - radius, y);
+        this.ctx.arcTo(x + width, y, x + width, y + radius, radius);
+        this.ctx.lineTo(x + width, y + height - radius);
+        this.ctx.arcTo(x + width, y + height, x + width - radius, y + height, radius);
+        this.ctx.lineTo(x + radius, y + height);
+        this.ctx.arcTo(x, y + height, x, y + height - radius, radius);
+        this.ctx.lineTo(x, y + radius);
+        this.ctx.arcTo(x, y, x + radius, y, radius);
+        this.ctx.closePath();
+        
+        if (fillColor) {
+            this.ctx.fillStyle = fillColor;
+            this.ctx.fill();
+        }
+        
+        if (strokeColor) {
+            this.ctx.strokeStyle = strokeColor;
+            this.ctx.lineWidth = 2;
+            this.ctx.stroke();
+        }
+    }
+
     updatePlayLinePosition() {
         // Линия должна быть внизу canvas, близко к клавиатуре
         this.playLineY = this.canvas.height - this.playLineOffset;
@@ -63,7 +88,7 @@ class NotesRenderer {
             const yStart = this.playLineY - (timeToStart * this.scrollSpeed);
             const yEnd = this.playLineY - (timeToEnd * this.scrollSpeed);
             
-            if (yEnd > this.canvas.height || yStart < 50) return;
+            if (yEnd > this.canvas.height || yStart < 0) return;
             
             const keyPos = this.piano.getKeyPosition(note.pitch);
             if (!keyPos) return;
@@ -76,14 +101,15 @@ class NotesRenderer {
             const color = settings ? settings.color : '#64ff64';
             
             const isPlayed = yStart > this.playLineY;
-            
+            this.drawRoundRect(x, yEnd, width, noteHeight, 6, isPlayed ? this.adjustColorBrightness(color, -50) : color, isPlayed ? '#3c3c3c' : '#000000')
+            /*
             this.ctx.fillStyle = isPlayed ? this.adjustColorBrightness(color, -50) : color;
             this.ctx.fillRect(x, yEnd, width, noteHeight);
             
             this.ctx.strokeStyle = isPlayed ? '#3c3c3c' : '#000000';
             this.ctx.lineWidth = 1;
             this.ctx.strokeRect(x, yEnd, width, noteHeight);
-            
+            */
             if (note.start_time <= currentTime && note.end_time >= currentTime) {
                 activeNotes.push({
                     pitch: note.pitch,
