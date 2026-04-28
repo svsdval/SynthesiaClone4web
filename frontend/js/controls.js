@@ -207,11 +207,11 @@ class Controls {
             
             learningCb.addEventListener('change', () => {
                 if (learningCb.checked) {
-                    this.app.channelSettings.forEach((s, ch) => {
-                        if (ch !== channel) {
-                            s.learning = false;
-                        }
-                    });
+                    //this.app.channelSettings.forEach((s, ch) => {
+                    //    if (ch !== channel) {
+                    //        s.learning = false;
+                    //    }
+                    //});
                     settings.learning = true;
                     this.showChannelsModal();
                 } else {
@@ -510,31 +510,34 @@ class Controls {
     generateQRCode(text) {
         const container = document.getElementById('qr-code-container');
         container.innerHTML = ''; // Очищаем
-        
-        if (typeof QRCode !== 'undefined') {
-            new QRCode(container, {
-                text: text,
-                width: 200,
-                height: 200,
-                colorDark: '#000000',
-                colorLight: '#ffffff',
-                correctLevel: QRCode.CorrectLevel.H
-            });
-        } else {
-            // Fallback если библиотека не загрузилась
-            const canvas = document.createElement('canvas');
-            canvas.id = 'qr-code-canvas';
-            canvas.width = 200;
-            canvas.height = 200;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#fff';
-            ctx.fillRect(0, 0, 200, 200);
-            ctx.fillStyle = '#000';
-            ctx.font = '12px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('QR Code library', 100, 90);
-            ctx.fillText('not loaded', 100, 110);
-            container.appendChild(canvas);
+        try {
+            if (typeof QRCode !== 'undefined') {
+                new QRCode(container, {
+                    text: text,
+                    width: 300,
+                    height: 300,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            } else {
+                // Fallback если библиотека не загрузилась
+                const canvas = document.createElement('canvas');
+                canvas.id = 'qr-code-canvas';
+                canvas.width = 300;
+                canvas.height = 300;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(0, 0, 200, 200);
+                ctx.fillStyle = '#000';
+                ctx.font = '12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('QR Code library', 100, 90);
+                ctx.fillText('not loaded', 100, 110);
+                container.appendChild(canvas);
+            }
+        } catch (error) {
+            console.error('QR code generation error:', error);
         }
     }
 

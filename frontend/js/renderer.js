@@ -9,7 +9,7 @@ class NotesRenderer {
         this.scrollSpeed = 200;
         this.lookaheadTime = 5.0;
         this.lookbehindTime = 2.0;
-        this.playLineOffset = 10;
+        this.playLineOffset = 1;
         this.playLineY = 0;
         
         setTimeout(() => this.resize(), 200);
@@ -32,28 +32,36 @@ class NotesRenderer {
     }
     
     drawRoundRect(x, y, width, height, radius, fillColor, strokeColor) {
-        this.ctx.beginPath();
-        this.ctx.moveTo(x + radius, y);
-        this.ctx.lineTo(x + width - radius, y);
-        this.ctx.arcTo(x + width, y, x + width, y + radius, radius);
-        this.ctx.lineTo(x + width, y + height - radius);
-        this.ctx.arcTo(x + width, y + height, x + width - radius, y + height, radius);
-        this.ctx.lineTo(x + radius, y + height);
-        this.ctx.arcTo(x, y + height, x, y + height - radius, radius);
-        this.ctx.lineTo(x, y + radius);
-        this.ctx.arcTo(x, y, x + radius, y, radius);
-        this.ctx.closePath();
-        
-        if (fillColor) {
+        if ((radius *1.5 > height) || (radius *1.5 > width))
+        {
             this.ctx.fillStyle = fillColor;
-            this.ctx.fill();
-        }
+            this.ctx.fillRect(x, y, width, height);
+            this.ctx.strokeStyle = fillColor;
+            this.ctx.lineWidth = 1;
+            this.ctx.strokeRect(x, y, width, height);
+        } else {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x + radius, y);
+            this.ctx.lineTo(x + width - radius, y);
+            this.ctx.arcTo(x + width, y, x + width, y + radius, radius);
+            this.ctx.lineTo(x + width, y + height - radius);
+            this.ctx.arcTo(x + width, y + height, x + width - radius, y + height, radius);
+            this.ctx.lineTo(x + radius, y + height);
+            this.ctx.arcTo(x, y + height, x, y + height - radius, radius);
+            this.ctx.lineTo(x, y + radius);
+            this.ctx.arcTo(x, y, x + radius, y, radius);
+            this.ctx.closePath();
+
+            if (fillColor) {
+                this.ctx.fillStyle = fillColor;
+                this.ctx.fill();
+            }
         
-        if (strokeColor) {
-            this.ctx.strokeStyle = strokeColor;
-            this.ctx.lineWidth = 2;
-            this.ctx.stroke();
-        }
+            if (strokeColor) {
+                this.ctx.strokeStyle = strokeColor;
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+            }
     }
 
     updatePlayLinePosition() {
