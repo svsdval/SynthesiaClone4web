@@ -6,6 +6,7 @@ import rtmidi
 import os
 import json
 from pathlib import Path
+from collections import defaultdict
 
 app = Flask(__name__)
 CORS(app)
@@ -19,6 +20,29 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
 # ... существующий код parse_midi_file ...
+
+def add_note_gaps(notes, note_gap=0.02):
+    """Добавить зазоры между последовательными нотами одного pitch"""
+    notes_by_pitch = defaultdict(list)
+                
+    for note in notes:
+        notes_by_pitch[note['pitch']].append(note)
+        
+    for pitch, pitch_notes in notes_by_pitch.items():
+        pitch_notes.sort(key=lambda n: n['start_time'])
+
+        for i in range(len(pitch_notes) - 1):
+            current_note = pitch_notes[i]
+            next_note = pitch_notes[i + 1]
+            
+            if abs(next_note['start_time'] - current_note['end_time']) < 0.001:
+                current_note['end_time'] -= note_gap
+#                current_note['end_time'] -= note_gap / 2
+#                next_note['start_time'] += note_gap / 2
+
+                if current_note['end_time'] <= current_note['start_time']:
+                    current_note['end_time'] = current_note['start_time'] + 0.01
+
 def parse_midi_file(filepath):
     """Parse MIDI file and return notes data with proper bank detection"""
     parse_debug = False
@@ -109,6 +133,7 @@ def parse_midi_file(filepath):
                         del active_notes[key]
         
         notes.sort(key=lambda n: n['start_time'])
+        add_note_gaps(notes)
         
         total_time = max(n['end_time'] for n in notes) if notes else 0
         
