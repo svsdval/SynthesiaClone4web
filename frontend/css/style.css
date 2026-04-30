@@ -51,7 +51,7 @@ header h1 {
 
 /* Progress Bar - наверху */
 #progress-container {
-    padding: 10px 20px;
+    padding: 4px 10px;
     background: #1e2433;
     border-bottom: 1px solid #2a3142;
     flex-shrink: 0;
@@ -61,9 +61,9 @@ header h1 {
 
 #progress-bar {
     position: relative;
-    height: 30px;
+    height: 20px;
     background: #3c4354;
-    border-radius: 15px;
+    border-radius: 10px;
     cursor: pointer;
     overflow: hidden;
 }

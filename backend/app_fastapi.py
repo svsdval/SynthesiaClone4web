@@ -227,7 +227,7 @@ async def list_files():
     files.sort(key=lambda x: x['name'].lower())
     return {"files": files}
 
-@app.get("/api/parse/{filename}", response_model=Dict[str, Any])
+@app.get("/api/parse/{filename:path}", response_model=Dict[str, Any])
 async def parse_file(filename: str):
     """Parse a MIDI file and return its data"""
     filepath = os.path.join(MIDI_FOLDER, filename)
