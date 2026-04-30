@@ -13,10 +13,10 @@
             <h1>🎹 Synthesia Clone</h1>
             <div class="header-controls">
                 <button id="btn-open-file" class="btn btn-primary">
-                    📁 Open File
+                    📁 Select MIDI
                 </button>
                 <button id="btn-upload" class="btn btn-primary">
-                    📤 Upload MIDI
+                    📤 Upload MIDI to learn
                 </button>
                 <button id="btn-channels" class="btn">
                     🎨 Channels
@@ -77,21 +77,23 @@
                 <button id="btn-stop" class="btn btn-large" disabled>
                     ⏹️ Stop
                 </button>
-            </div>
 
-            <div class="control-group">
-                <label>Speed:</label>
-                <input type="range" id="speed-slider" min="50" max="400" value="200" step="10">
-                <span id="speed-value">200 px/s</span>
-            </div>
-
-            <div class="control-group">
                 <button id="btn-seek-back" class="btn">
                     ⏪ -10s
                 </button>
                 <button id="btn-seek-forward" class="btn">
                     ⏩ +10s
                 </button>
+            </div>
+
+            <div class="control-group">
+                <label>Scroll speed:</label>
+                <input type="range" id="speed-slider" min="50" max="400" value="200" step="10">
+                <span id="speed-value">200 px/s</span>
+
+                <label>Play speed:</label>
+                <input type="range" id="play-speed-slider" min="10" max="200" value="100" step="10">
+                <span id="play-speed-value">100%</span>
             </div>
 
             <div id="status-display">

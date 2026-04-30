@@ -20,7 +20,8 @@ os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
 # ... существующий код parse_midi_file ...
 def parse_midi_file(filepath):
-    """Parse MIDI file and return notes data"""
+    """Parse MIDI file and return notes data with proper bank detection"""
+    parse_debug = False
     try:
         midi_file = MidiFile(filepath)
         
@@ -29,8 +30,21 @@ def parse_midi_file(filepath):
         ticks_per_beat = midi_file.ticks_per_beat
         
         channels_used = set()
-        channel_programs = {}  # Сохраняем программы каналов
+        channel_programs = {}
+        channel_banks = {}
+        drum_channels = set()  # Отслеживаем барабанные каналы
         
+        # Первый проход - собираем информацию о барабанных каналах
+        for track_idx, track in enumerate(midi_file.tracks):
+            for msg in track:
+                # Проверяем явные установки барабанного банка
+                if msg.type == 'control_change' and msg.control == 0:
+                    if msg.value == 120 or msg.value == 127 or msg.value == 128:
+                        drum_channels.add(msg.channel)
+                        if parse_debug:
+                            print(f"Drum channel detected: {msg.channel} (Bank MSB={msg.value})")
+        
+        # Второй проход - основной парсинг
         for track_idx, track in enumerate(midi_file.tracks):
             current_time = 0.0
             active_notes = {}
@@ -41,10 +55,37 @@ def parse_midi_file(filepath):
                 if msg.type == 'set_tempo':
                     tempo = msg.tempo
                 
-                # ИСПРАВЛЕНИЕ: Сохраняем программы каналов
+                elif msg.type == 'control_change':
+                    # Bank Select MSB (CC 0)
+                    if msg.control == 0:
+                        if msg.channel not in channel_banks:
+                            channel_banks[msg.channel] = {'msb': 0, 'lsb': 0}
+                        channel_banks[msg.channel]['msb'] = msg.value
+                        
+                        # Проверяем барабанные банки
+                        if msg.value in [120, 127, 128]:
+                            drum_channels.add(msg.channel)
+                        if parse_debug:                        
+                            print(f"Track {track_idx}: Channel {msg.channel} -> Bank MSB {msg.value}")
+                    
+                    # Bank Select LSB (CC 32)
+                    elif msg.control == 32:
+                        if msg.channel not in channel_banks:
+                            channel_banks[msg.channel] = {'msb': 0, 'lsb': 0}
+                        channel_banks[msg.channel]['lsb'] = msg.value
+                        if parse_debug:
+                            print(f"Track {track_idx}: Channel {msg.channel} -> Bank LSB {msg.value}")
+                
                 elif msg.type == 'program_change':
                     channel_programs[msg.channel] = msg.program
-                    print(f"Track {track_idx}: Channel {msg.channel} -> Program {msg.program}")
+                    
+                    bank_info = channel_banks.get(msg.channel, {'msb': 0, 'lsb': 0})
+                    bank_number = (bank_info['msb'] << 7) | bank_info['lsb']
+                    
+                    if parse_debug:
+                       print(f"Track {track_idx}: Channel {msg.channel} -> "
+                          f"Program {msg.program}, Bank {bank_info['msb']}:{bank_info['lsb']} "
+                          f"(Combined: {bank_number})")
                 
                 elif msg.type == 'note_on' and msg.velocity > 0:
                     key = (msg.note, msg.channel)
@@ -71,19 +112,53 @@ def parse_midi_file(filepath):
         
         total_time = max(n['end_time'] for n in notes) if notes else 0
         
-        # Устанавливаем программу 0 для каналов без явно указанной программы
+        # Устанавливаем значения банков
         for channel in channels_used:
             if channel not in channel_programs:
                 channel_programs[channel] = 0
+            
+            if channel not in channel_banks:
+                # Канал 9 или явно помеченный барабанный канал
+                if channel == 9 or channel in drum_channels:
+                    channel_banks[channel] = {'msb': 128, 'lsb': 0}
+                    drum_channels.add(channel)
+                else:
+                    channel_banks[channel] = {'msb': 0, 'lsb': 0}
+            else:
+                # Проверяем, не является ли установленный банк барабанным
+                if channel_banks[channel]['msb'] in [120, 127, 128]:
+                    drum_channels.add(channel)
         
-        print(f"Channel programs: {channel_programs}")
+        # Если канал 9 используется, но банк не установлен явно - устанавливаем 128
+        if 9 in channels_used and channel_banks.get(9, {}).get('msb', 0) == 0:
+            channel_banks[9] = {'msb': 128, 'lsb': 0}
+            drum_channels.add(9)
+        
+        if parse_debug:
+           print(f"\n=== MIDI File Summary ===")
+           print(f"Channel programs: {channel_programs}")
+           print(f"Channel banks: {channel_banks}")
+           print(f"Drum channels: {sorted(drum_channels)}")
+        
+           print(f"\n=== Detailed Channel Info ===")
+           for channel in sorted(channels_used):
+               bank = channel_banks[channel]
+               program = channel_programs[channel]
+               bank_combined = (bank['msb'] << 7) | bank['lsb']
+               is_drum = channel in drum_channels
+               channel_type = "🥁 DRUMS" if is_drum else "🎵 Melodic"
+               
+               print(f"Channel {channel:2d}: Bank {bank['msb']:3d}:{bank['lsb']:3d} "
+                     f"(Combined: {bank_combined:5d}), Program {program:3d} - {channel_type}")
         
         return {
             'success': True,
             'notes': notes,
             'total_time': total_time,
             'channels': sorted(list(channels_used)),
-            'channel_programs': channel_programs,  # ИСПРАВЛЕНИЕ: Добавляем программы
+            'channel_programs': channel_programs,
+            'channel_banks': channel_banks,
+            'drum_channels': sorted(list(drum_channels)),
             'ticks_per_beat': ticks_per_beat
         }
         

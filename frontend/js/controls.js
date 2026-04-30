@@ -171,7 +171,7 @@ class Controls {
             item.className = 'channel-item';
             
             item.innerHTML = `
-                <span class="channel-label">Ch ${channel}</span>
+                <span class="channel-label">Ch ${channel} ${settings.suffix}</span>
                 <div class="channel-controls">
                     <label>
                         <input type="checkbox" class="ch-visible" ${settings.visible ? 'checked' : ''}>

@@ -13,6 +13,8 @@ class SynthesiaApp {
         this.controls = null;
         
         this.scrollSpeed = 200;
+        this.playSpeed = 1.0;
+
         this.channelSettings = new Map();
         this.webMIDI = null;
         
@@ -145,6 +147,12 @@ class SynthesiaApp {
             this.scrollSpeed = parseInt(e.target.value);
             document.getElementById('speed-value').textContent = `${this.scrollSpeed} px/s`;
             this.renderer.setScrollSpeed(this.scrollSpeed);
+        });
+
+        const playSpeedSlider = document.getElementById('play-speed-slider');
+        playSpeedSlider.addEventListener('input', (e) => {
+            this.playSpeed = parseInt(e.target.value) *0.01;
+            document.getElementById('play-speed-value').textContent = `${ Math.floor(this.playSpeed * 100) }%`;
         });
         
         document.getElementById('btn-seek-back').addEventListener('click', () => {
@@ -597,7 +605,7 @@ class SynthesiaApp {
                 this.userPressedNotes.clear();
                 this.activePlaybackNotes.clear();
                 
-                this.setupChannels(data.channels, data.channel_programs || {});
+                this.setupChannels(data.channels, data.channel_programs || {}, data.channel_banks || {});
                 this.piano.calculateLayout(data.notes);
                 this.renderer.setNotes(data.notes, this.channelSettings);
                 this.renderer.updatePlayLinePosition();
@@ -647,7 +655,7 @@ class SynthesiaApp {
         console.log('Cleanup complete');
     }
 
-    setupChannels(channels, channelPrograms = {}) {
+    setupChannels(channels, channelPrograms = {},channelBanks = {}) {
         const defaultColors = [
             '#64ff64', '#64c8ff', '#ffc864', '#ff64ff',
             '#ffff64', '#96ffa0', '#9696ff', '#ff9696',
@@ -660,16 +668,23 @@ class SynthesiaApp {
         channels.forEach(ch => {
             // ИСПРАВЛЕНИЕ: Используем программу из channelPrograms
             const program = channelPrograms[ch] !== undefined ? channelPrograms[ch] : 0;
+            const bank = channelBanks[ch] !== undefined ? channelBanks[ch].msb : 0;
+            const isplayback = bank !== 128 ? true : false;
+
             
             this.channelSettings.set(ch, {
-                visible: true,
-                playback: true,
+                visible: isplayback,
+                playback: isplayback,
                 learning: false,
                 program: program,  // Используем реальную программу из MIDI файла
-                color: defaultColors[ch % defaultColors.length]
+                color: defaultColors[ch % defaultColors.length],
+
+                bank : bank,
+                suffix : isplayback ? '' : 'drums'
+
             });
             
-            console.log(`Channel ${ch} setup with program ${program}`);
+            console.log(`Channel ${ch} setup with program ${program} and bank ${bank}`);
         });
         
         console.log(`Setup ${channels.length} channels with programs:`, channelPrograms);
@@ -948,7 +963,7 @@ class SynthesiaApp {
             return;
         }
         
-        this.currentTime += dt;
+        this.currentTime += dt *  this.playSpeed;
         
         if (this.currentTime >= this.totalTime) {
             this.stop();
@@ -1174,6 +1189,13 @@ class SynthesiaApp {
         this.scrollSpeed = Math.max(50, Math.min(400, this.scrollSpeed + delta));
         document.getElementById('speed-slider').value = this.scrollSpeed;
         document.getElementById('speed-value').textContent = `${this.scrollSpeed} px/s`;
+        this.renderer.setScrollSpeed(this.scrollSpeed);
+    }
+
+    adjustPlaySpeed(delta) {
+        this.scrollSpeed = Math.max(10, Math.min(400, this.scrollSpeed + delta));
+        document.getElementById('play-speed-slider').value = this.scrollSpeed;
+        document.getElementById('play-speed-value').textContent = `${this.scrollSpeed} %`;
         this.renderer.setScrollSpeed(this.scrollSpeed);
     }
     

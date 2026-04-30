@@ -62,6 +62,7 @@ class NotesRenderer {
                 this.ctx.lineWidth = 2;
                 this.ctx.stroke();
             }
+       }
     }
 
     updatePlayLinePosition() {
@@ -70,7 +71,16 @@ class NotesRenderer {
         this.adjustLookahead();
         console.log(`Play line position: ${this.playLineY}, canvas height: ${this.canvas.height}`);
     }
-    
+
+    drawText(x,y, text, lineWidth=2) {
+              this.ctx.font = 'bold 24px Arial';
+              this.ctx.fillStyle = '#000';
+              this.ctx.strokeStyle = '#ff9900';
+              this.ctx.lineWidth = lineWidth;
+              this.ctx.strokeText(text, x, y);
+              this.ctx.fillText(text, x, y);
+    }
+
     render(currentTime) {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
@@ -88,41 +98,67 @@ class NotesRenderer {
             return note.end_time >= currentTime - this.lookbehindTime &&
                    note.start_time <= currentTime + this.lookaheadTime;
         });
-        
+        // Сначала рисуем белые клавиши
         visibleNotes.forEach(note => {
-            const timeToStart = note.start_time - currentTime;
-            const timeToEnd = note.end_time - currentTime;
-            
-            const yStart = this.playLineY - (timeToStart * this.scrollSpeed);
-            const yEnd = this.playLineY - (timeToEnd * this.scrollSpeed);
-            
-            if (yEnd > this.canvas.height || yStart < 0) return;
-            
-            const keyPos = this.piano.getKeyPosition(note.pitch);
-            if (!keyPos) return;
-            
-            const x = keyPos.x + 2;
-            const width = keyPos.width - 4;
-            const noteHeight = Math.max(1, yStart - yEnd);
-            
-            const settings = this.channelSettings.get(note.channel);
-            const color = settings ? settings.color : '#64ff64';
-            
-            const isPlayed = yStart > this.playLineY;
-            this.drawRoundRect(x, yEnd, width, noteHeight, 6, isPlayed ? this.adjustColorBrightness(color, -50) : color, isPlayed ? '#3c3c3c' : '#000000')
-            /*
-            this.ctx.fillStyle = isPlayed ? this.adjustColorBrightness(color, -50) : color;
-            this.ctx.fillRect(x, yEnd, width, noteHeight);
-            
-            this.ctx.strokeStyle = isPlayed ? '#3c3c3c' : '#000000';
-            this.ctx.lineWidth = 1;
-            this.ctx.strokeRect(x, yEnd, width, noteHeight);
-            */
-            if (note.start_time <= currentTime && note.end_time >= currentTime) {
-                activeNotes.push({
-                    pitch: note.pitch,
-                    color: color
-                });
+            if ( ! this.piano.isBlackKey(note.pitch)) {
+              const timeToStart = note.start_time - currentTime;
+              const timeToEnd = note.end_time - currentTime;
+              
+              const yStart = this.playLineY - (timeToStart * this.scrollSpeed);
+              const yEnd = this.playLineY - (timeToEnd * this.scrollSpeed);
+              
+              if (yEnd > this.canvas.height || yStart < 0) return;
+              
+              const keyPos = this.piano.getKeyPosition(note.pitch);
+              if (!keyPos) return;
+              
+              const x = keyPos.x + 2;
+              const width = keyPos.width - 4;
+              const noteHeight = Math.max(1, yStart - yEnd);
+              
+              const settings = this.channelSettings.get(note.channel);
+              const color = settings ? settings.color : '#64ff64';
+              
+              const isPlayed = yStart > this.playLineY;
+              this.drawRoundRect(x, yEnd, width, noteHeight, 6, isPlayed ? this.adjustColorBrightness(color, -50) : color, isPlayed ? '#3c3c3c' : '#000000')
+              if (note.start_time <= currentTime && note.end_time >= currentTime) {
+                  activeNotes.push({
+                      pitch: note.pitch,
+                      color: color
+                  });
+              }
+            }
+        });
+        // После рисуем чёрные клавиши, что бы белые их не перекрыли...
+        visibleNotes.forEach(note => {
+            if ( this.piano.isBlackKey(note.pitch)) {
+                const timeToStart = note.start_time - currentTime;
+                const timeToEnd = note.end_time - currentTime;
+                
+                const yStart = this.playLineY - (timeToStart * this.scrollSpeed);
+                const yEnd = this.playLineY - (timeToEnd * this.scrollSpeed);
+                
+                if (yEnd > this.canvas.height || yStart < 0) return;
+                
+                const keyPos = this.piano.getKeyPosition(note.pitch);
+                if (!keyPos) return;
+                
+                const x = keyPos.x + 2;
+                const width = keyPos.width - 4;
+                const noteHeight = Math.max(1, yStart - yEnd);
+                
+                const settings = this.channelSettings.get(note.channel);
+                const color = settings ? settings.color : '#64ff64';
+                
+                const isPlayed = yStart > this.playLineY;
+                this.drawRoundRect(x, yEnd, width, noteHeight, 6, isPlayed ? this.adjustColorBrightness(color, -50) : color, isPlayed ? '#3c3c3c' : '#000000')
+
+                if (note.start_time <= currentTime && note.end_time >= currentTime) {
+                    activeNotes.push({
+                        pitch: note.pitch,
+                        color: color
+                    });
+                }
             }
         });
         
