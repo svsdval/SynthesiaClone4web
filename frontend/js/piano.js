@@ -10,6 +10,8 @@ class PianoKeyboard {
         this.whiteKeyWidth = 0;
         this.whiteKeyCount = 0;
         this.isInitialized = false;
+
+        this.channelSettings = null;
         
         setTimeout(() => this.initializeKeys(), 100);
     }
@@ -19,12 +21,56 @@ class PianoKeyboard {
         return [1, 3, 6, 8, 10].includes(noteInOctave);
     }
     
-    calculateLayout(notes) {
-        if (!notes || notes.length === 0) return;
+    safeMin(maxValue, variable) {
+        // Проверяем, является ли переменная числом
+        if (typeof variable !== 'number' || isNaN(variable)) {
+            return maxValue;
+        }
         
-        const notePitches = notes.map(n => n.pitch);
-        this.minNote = Math.max(21, Math.min(...notePitches) - 3);
-        this.maxNote = Math.min(108, Math.max(...notePitches) + 3);
+        // Проверяем, является ли число конечным
+        if (!isFinite(variable)) {
+            return maxValue;
+        }
+        
+        return Math.min(maxValue, variable);
+    }
+
+    safeMax(minValue, variable) {
+        // Проверяем, является ли переменная числом
+        if (typeof variable !== 'number' || isNaN(variable)) {
+            return minValue;
+        }
+        
+        // Проверяем, является ли число конечным
+        if (!isFinite(variable)) {
+            return minValue;
+        }
+        
+        return Math.max(minValue, variable);
+    }
+
+    calculateLayout(notes, channelSettings) {
+        if (!notes || notes.length === 0) {
+          console.log('no notes to calculate Layout');
+          return;
+        }
+        this.channelSettings = channelSettings;
+        var visibleNotes = null;
+        if (!channelSettings) { 
+           visibleNotes = notes;
+        } else {
+           visibleNotes = notes.filter(note => {
+            const settings = channelSettings.get(note.channel);
+            if (!settings || !settings.visible) return false;
+            
+            return true;
+        });
+
+        }
+
+        const notePitches = visibleNotes.map(n => n.pitch);
+        this.minNote = this.safeMax(21, Math.min(...notePitches) - 3);
+        this.maxNote = this.safeMin(108, Math.max(...notePitches) + 3);
         
         console.log(`Calculating piano layout for notes ${this.minNote}-${this.maxNote}`);
         this.initializeKeys();

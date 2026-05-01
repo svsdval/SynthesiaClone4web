@@ -11,13 +11,14 @@ class SynthesiaApp {
         this.piano = null;
         this.renderer = null;
         this.controls = null;
+        this.notes = null;
         
         this.scrollSpeed = 200;
         this.playSpeed = 1.0;
 
         this.channelSettings = new Map();
         this.webMIDI = null;
-        
+
         this.selectedMIDIInputs = new Set();
         this.selectedMIDIOutputs = new Set();
         this.selectedMIDILighting = null; // Устройство для подсветки
@@ -579,7 +580,8 @@ class SynthesiaApp {
     async loadMIDI(path, updateURL = true) {
         try {
             document.getElementById('status-text').textContent = 'Loading...';
-            
+            this.renderer.setMidiName(path);
+
             if (this.playing) {
                 this.stop();
             } else {
@@ -604,9 +606,10 @@ class SynthesiaApp {
                 this.waitingNotes.clear();
                 this.userPressedNotes.clear();
                 this.activePlaybackNotes.clear();
+                this.notes = data.notes;
                 
                 this.setupChannels(data.channels, data.channel_programs || {}, data.channel_banks || {});
-                this.piano.calculateLayout(data.notes);
+                this.piano.calculateLayout(data.notes, this.channelSettings);
                 this.renderer.setNotes(data.notes, this.channelSettings);
                 this.renderer.updatePlayLinePosition();
                 
@@ -1002,6 +1005,8 @@ class SynthesiaApp {
         this.piano.updateActiveNotes(displayNotes);
         
         this.animationId = requestAnimationFrame(() => this.animate());
+        //this.animationId = setTimeout(() => this.animate(), 16); // ~60 FPS
+
     }
     
     getActualWaitingNotes() {

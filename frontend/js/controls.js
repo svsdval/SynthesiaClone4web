@@ -126,10 +126,12 @@ class Controls {
                 this.app.midiData = data;
                 this.app.totalTime = data.total_time;
                 this.app.currentTime = 0;
+                this.app.renderer.setMidiName(`Uploaded: ${file.name}`);
+                this.app.notes = data.notes;
                 
                 // ИСПРАВЛЕНИЕ: Передаем channel_programs в setupChannels
                 this.app.setupChannels(data.channels, data.channel_programs || {});
-                this.app.piano.calculateLayout(data.notes);
+                this.app.piano.calculateLayout(data.notes, this.app.channelSettings);
                 this.app.renderer.setNotes(data.notes, this.app.channelSettings);
                 this.app.renderer.updatePlayLinePosition();
                 
@@ -196,9 +198,14 @@ class Controls {
             
             visibleCb.addEventListener('change', () => {
                 settings.visible = visibleCb.checked;
+
                 if (this.app.playing) {
                     this.app.renderer.render(this.app.currentTime);
                 }
+                // Автоматически подгоняем размер клавиатуры под видимые ноты
+                this.app.piano.calculateLayout(this.app.notes, this.app.channelSettings);
+                this.app.renderer.render(this.app.currentTime);
+
             });
             
             playbackCb.addEventListener('change', () => {

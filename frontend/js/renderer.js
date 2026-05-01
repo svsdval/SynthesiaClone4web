@@ -3,7 +3,8 @@ class NotesRenderer {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
         this.piano = piano;
-        
+        this.midiName = '';
+
         this.notes = [];
         this.channelSettings = null;
         this.scrollSpeed = 200;
@@ -15,6 +16,10 @@ class NotesRenderer {
         setTimeout(() => this.resize(), 200);
     }
     
+    setMidiName(name) {
+        this.midiName = name;
+    }
+
     setNotes(notes, channelSettings) {
         this.notes = notes;
         this.channelSettings = channelSettings;
@@ -73,8 +78,8 @@ class NotesRenderer {
     }
 
     drawText(x,y, text, lineWidth=2) {
-              this.ctx.font = 'bold 24px Arial';
-              this.ctx.fillStyle = '#000';
+              this.ctx.font = 'bold 14px Arial';
+              this.ctx.fillStyle = '#FFF';
               this.ctx.strokeStyle = '#ff9900';
               this.ctx.lineWidth = lineWidth;
               this.ctx.strokeText(text, x, y);
@@ -172,6 +177,7 @@ class NotesRenderer {
         this.ctx.lineTo(this.canvas.width, this.playLineY);
         this.ctx.stroke();
         this.ctx.shadowBlur = 0;
+        this.drawText(0,20, this.midiName);
         
         return activeNotes;
     }

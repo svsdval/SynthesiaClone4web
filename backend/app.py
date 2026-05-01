@@ -209,7 +209,7 @@ def list_files():
                 full_path = os.path.join(root, file)
                 rel_path = os.path.relpath(full_path, MIDI_FOLDER)
                 files.append({
-                    'name': file,
+                    'name': rel_path,
                     'path': rel_path,
                     'size': os.path.getsize(full_path)
                 })
