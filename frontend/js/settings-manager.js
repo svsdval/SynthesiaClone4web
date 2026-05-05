@@ -35,7 +35,8 @@ class SettingsManager {
             // НОВОЕ: Настройки Audio Engine
             audioEngine: {
                 enabled: app.useAudioEngine,
-                volume: app.audioEngine.volume
+                volume: app.audioEngine.volume,
+                sePianoOnly: app.audioEngineUsePianoOnly
             },
             
             // Цвета каналов
@@ -97,6 +98,12 @@ class SettingsManager {
                 app.lightingProgram = settings.lighting.program || 0;
             }
             
+            if (settings.audioEngine) {
+                if (settings.audioEngine.usePianoOnly !== undefined) {
+                    app.audioEngineUsePianoOnly = settings.audioEngine.usePianoOnly;
+                    app.audioEngine.setPianoOnly(settings.audioEngine.usePianoOnly);
+                }
+            }            
             // Применяем другие настройки
             if (settings.scrollSpeed) {
                 app.scrollSpeed = settings.scrollSpeed;

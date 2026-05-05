@@ -19,8 +19,6 @@ os.makedirs(MIDI_FOLDER, exist_ok=True)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
-# ... существующий код parse_midi_file ...
-
 def add_note_gaps(notes, note_gap=0.02):
     """Добавить зазоры между последовательными нотами одного pitch"""
     notes_by_pitch = defaultdict(list)
@@ -37,8 +35,6 @@ def add_note_gaps(notes, note_gap=0.02):
             
             if abs(next_note['start_time'] - current_note['end_time']) < 0.001:
                 current_note['end_time'] -= note_gap
-#                current_note['end_time'] -= note_gap / 2
-#                next_note['start_time'] += note_gap / 2
 
                 if current_note['end_time'] <= current_note['start_time']:
                     current_note['end_time'] = current_note['start_time'] + 0.01
@@ -253,40 +249,65 @@ def upload_file():
     
     return jsonify(result)
 
-# НОВОЕ: Роут для аудио семплов
-@app.route('/api/audio/piano/<int:note>.mp3', methods=['GET'])
-def get_piano_sample(note):
-    """Get piano audio sample for a specific note"""
-    if note < 21 or note > 108:
-        return jsonify({'success': False, 'error': 'Invalid note number'}), 400
-    
-    filepath = os.path.join(AUDIO_FOLDER, f'{note}.mp3')
+
+@app.route('/api/audio/<path:sample_path>', methods=['GET'])
+def get_audio_sample(sample_path):
+    """Get audio sample for a specific note and instrument"""
+    # sample_path будет в формате: "piano/60.mp3" или "drums/36.mp3"
+    filepath = os.path.join('./audio', sample_path)
     
     if os.path.exists(filepath):
         return send_file(filepath, mimetype='audio/mpeg')
     else:
-        # Возвращаем пустой звук если файл не найден
         return jsonify({'success': False, 'error': 'Sample not found'}), 404
 
-# НОВОЕ: Проверка доступности аудио семплов
-@app.route('/api/audio/check', methods=['GET'])
-def check_audio_samples():
-    """Check which audio samples are available"""
-    available = []
+# Новый роут для проверки доступных сэмплов с учетом инструментов
+@app.route('/api/audio/check', methods=['POST'])
+def check_audio_samples_for_channels():
+    """Check which audio samples are available for specific channels"""
+    data = request.json
+    channels_info = data.get('channels', {})
     
-    if os.path.exists(AUDIO_FOLDER):
-        for note in range(21, 109):  # A0 to C8
-            filepath = os.path.join(AUDIO_FOLDER, f'{note}.mp3')
-            if os.path.exists(filepath):
-                available.append(note)
+    result = {}
+    
+    for channel_str, info in channels_info.items():
+        channel = int(channel_str)
+        program = info.get('program', 0)
+        bank = info.get('bank', 0)
+        
+        # Определяем папку для поиска сэмплов
+        if bank == 128 or channel == 9:
+            # Ударные
+            folder_name = 'drums'
+        else:
+            # Мелодические инструменты - по номеру программы
+            folder_name = f'{program}'
+            
+            # Если папки для программы нет, пробуем дефолтную
+            folder_path = os.path.join('./audio', folder_name)
+            if not os.path.exists(folder_path):
+                folder_name = 'piano'  # Fallback на пианино
+        
+        folder_path = os.path.join('./audio', folder_name)
+        available = []
+        
+        if os.path.exists(folder_path):
+            for note in range(0, 128):
+                filepath = os.path.join(folder_path, f'{note}.mp3')
+                if os.path.exists(filepath):
+                    available.append(note)
+        
+        result[channel] = {
+            'folder': folder_name,
+            'available': available,
+            'total': len(available)
+        }
     
     return jsonify({
         'success': True,
-        'available': available,
-        'total': len(available),
-        'min_note': min(available) if available else None,
-        'max_note': max(available) if available else None
+        'channels': result
     })
+
 
 @app.route('/api/devices', methods=['GET'])
 def get_devices():

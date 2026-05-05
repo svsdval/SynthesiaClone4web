@@ -53,6 +53,7 @@ class SynthesiaApp {
         this.audioEngine = new AudioEngine();
         this.useAudioEngine = false;
         this.audioEngineSoundsMap = new Map(); // Для отслеживания soundId
+        this.audioEngineUsePianoOnly = false; // Параметр для принудительного использования только piano
 
         this.checkURLParams();
         this.init();
@@ -517,11 +518,11 @@ class SynthesiaApp {
             }
         }
         
-        // Воспроизводим через Audio Engine если включен
+        // Воспроизводим через Audio Engine если включен и передаем channel
         if (this.useAudioEngine && this.audioEngine.enabled) {
             if (command === 0x90 && velocity > 0) {
                 // Note On
-                const soundId = this.audioEngine.playNote(note, velocity);
+                const soundId = this.audioEngine.playNote(note, velocity, channel);
                 if (soundId) {
                     this.audioEngineSoundsMap.set(`${note}_${channel}`, soundId);
                 }
@@ -529,12 +530,12 @@ class SynthesiaApp {
                 // Note Off
                 const key = `${note}_${channel}`;
                 const soundId = this.audioEngineSoundsMap.get(key);
+                // Останавливаем все звуки ноты указанного канала
                 if (soundId) {
-                    this.audioEngine.stopNote(note, soundId);
+                    this.audioEngine.stopNote(note, channel, soundId);
                     this.audioEngineSoundsMap.delete(key);
                 } else {
-                    // Останавливаем все звуки этой ноты
-                    this.audioEngine.stopNote(note);
+                    this.audioEngine.stopNote(note, channel);
                 }
             }
         }
@@ -621,14 +622,17 @@ class SynthesiaApp {
                 }, 100);
                 
                 document.getElementById('status-text').textContent = 'Ready';
-                
-                // НОВОЕ: Обновляем URL
+                // Обновляем URL
                 if (updateURL) {
                     this.updateURL(path);
                 }
-                
                 // Сохраняем текущий путь для шаринга
                 this.currentMIDIPath = path;
+                
+                // Загружаем аудио сэмплы если Audio Engine включен
+                if (this.useAudioEngine) {
+                    await this.loadAudioSamplesForCurrentMIDI();
+                }
                 
                 console.log(`Loaded: ${data.notes.length} notes, ${data.total_time.toFixed(2)}s, channels: ${data.channels.join(',')}`);
                 console.log('Channel programs:', data.channel_programs);
@@ -641,7 +645,6 @@ class SynthesiaApp {
             document.getElementById('status-text').textContent = 'Error';
         }
     }
-
     
     cleanup() {
         console.log('Cleaning up...');
@@ -1264,7 +1267,7 @@ class SynthesiaApp {
         console.log(`Loading MIDI from URL: ${this.urlMidiFile}`);
         
         try {
-            await this.loadMIDI(this.urlMidiFile);
+            await this.loadMIDI(this.urlMidiFile, false); // false чтобы не менять URL повторно
             
             if (this.urlAutoplay) {
                 console.log('Auto-playing from URL parameter');
@@ -1276,7 +1279,7 @@ class SynthesiaApp {
             console.error('Error loading MIDI from URL:', error);
             this.showError(`Failed to load MIDI file from URL: ${this.urlMidiFile}`);
         }
-        
+
         // Очищаем после использования
         this.urlMidiFile = null;
         this.urlAutoplay = false;
@@ -1343,7 +1346,7 @@ class SynthesiaApp {
     }
 
     checkAudioEngineNeeded() {
-        // Автоматически включаем Audio Engine если нет MIDI выходов
+        // Включаем Audio Engine только если нет MIDI выходов
         if (this.selectedMIDIOutputs.size === 0) {
             console.log('No MIDI outputs selected, enabling Audio Engine');
             this.setAudioEngine(true);
@@ -1354,41 +1357,76 @@ class SynthesiaApp {
         this.useAudioEngine = enabled;
         this.audioEngine.setEnabled(enabled);
         
-        if (enabled && this.midiData && this.audioEngine.samples.size === 0) {
-            // Загружаем семплы если еще не загружены
-            await this.loadAudioSamplesForCurrentMIDI();
+        if (enabled && this.midiData) {
+            // Проверяем, загружены ли сэмплы для текущих каналов
+            let needsLoading = false;
+            
+            if (this.channelSettings) {
+                this.channelSettings.forEach((settings, channel) => {
+                    if (!this.audioEngine.channelSamples.has(channel) || 
+                        this.audioEngine.channelSamples.get(channel).size === 0) {
+                        needsLoading = true;
+                    }
+                });
+            } else {
+                needsLoading = true;
+            }
+            
+            if (needsLoading) {
+                await this.loadAudioSamplesForCurrentMIDI();
+            }
         }
         
         console.log(`Audio Engine ${enabled ? 'enabled' : 'disabled'}`);
     }
-
     async loadAudioSamplesForCurrentMIDI() {
-        if (!this.midiData || !this.midiData.notes) {
+        if (!this.midiData || !this.midiData.notes || !this.channelSettings) {
             return;
         }
         
-        // Собираем уникальные ноты из MIDI
-        const uniqueNotes = new Set();
+        // Сначала проверяем доступные сэмплы для всех каналов
+        await this.audioEngine.checkAvailableSamples(this.channelSettings);
+        
+        // Собираем уникальные ноты для каждого канала
+        const channelNotes = new Map();
+        
         this.midiData.notes.forEach(note => {
-            uniqueNotes.add(note.pitch);
+            if (!channelNotes.has(note.channel)) {
+                channelNotes.set(note.channel, new Set());
+            }
+            channelNotes.get(note.channel).add(note.pitch);
         });
         
-        const notesToLoad = Array.from(uniqueNotes).sort((a, b) => a - b);
-        
-        console.log(`Loading ${notesToLoad.length} audio samples...`);
-        
+        console.log(`Loading audio samples for ${channelNotes.size} channels...`);
         // Показываем прогресс
         const statusText = document.getElementById('status-text');
         const oldText = statusText.textContent;
         
-        await this.audioEngine.preloadSamples(notesToLoad, (loaded, total) => {
-            statusText.textContent = `Loading audio: ${loaded}/${total}`;
+        let totalLoaded = 0;
+        let totalToLoad = 0;
+        
+        channelNotes.forEach(notes => {
+            totalToLoad += notes.size;
         });
         
+        // Загружаем сэмплы для каждого канала
+        for (const [channel, notesSet] of channelNotes.entries()) {
+            const notes = Array.from(notesSet).sort((a, b) => a - b);
+            const channelSettings = this.channelSettings.get(channel);
+            const instrumentName = channelSettings?.bank === 128 ? 'drums' : `program ${channelSettings?.program || 0}`;
+            
+            console.log(`Loading channel ${channel} (${instrumentName}): ${notes.length} notes`);
+            
+            await this.audioEngine.preloadSamplesForChannel(channel, notes, (loaded, total, ch) => {
+                totalLoaded++;
+                statusText.textContent = `Loading audio: ${totalLoaded}/${totalToLoad} (Ch${ch})`;
+            });
+        }
+        
         statusText.textContent = oldText;
-        console.log('✓ Audio samples loaded');
+        console.log(`✓ Audio samples loaded for all channels`);
     }
-}
+  }
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {

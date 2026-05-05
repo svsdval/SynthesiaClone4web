@@ -661,6 +661,7 @@ class Controls {
         const volumeValue = document.getElementById('audio-volume-value');
         const loadSamplesBtn = document.getElementById('btn-load-audio-samples');
         const audioSettings = document.getElementById('audio-engine-settings');
+        const pianoOnlyCb = document.getElementById('audio-piano-only'); 
         
         if (enableCb) {
             enableCb.addEventListener('change', async () => {
@@ -678,6 +679,78 @@ class Controls {
                 
                 this.updateAudioEngineStatus();
             });
+        }
+
+        if (pianoOnlyCb) {
+                pianoOnlyCb.addEventListener('change', async () => {
+                    const pianoOnly = pianoOnlyCb.checked;
+                    this.app.audioEngineUsePianoOnly = pianoOnly;
+                    this.app.audioEngine.setPianoOnly(pianoOnly);
+                    
+                    // Если есть загруженный MIDI и Audio Engine включен, перезагружаем сэмплы
+                    if (this.app.midiData && this.app.useAudioEngine) {
+                        const statusText = document.getElementById('status-text');
+                        const oldText = statusText.textContent;
+                        
+                        statusText.textContent = pianoOnly ? 
+                            '🎹 Switching to Piano Only...' : 
+                            '🎵 Switching to Multi-instrument...';
+                        statusText.style.color = '#ffc864';
+                        
+                        // Отключаем кнопку загрузки на время перезагрузки
+                        if (loadSamplesBtn) {
+                            loadSamplesBtn.disabled = true;
+                            loadSamplesBtn.textContent = 'Loading...';
+                        }
+                        
+                        try {
+                            // Перезагружаем сэмплы с новыми настройками
+                            await this.app.loadAudioSamplesForCurrentMIDI();
+                            
+                            statusText.textContent = pianoOnly ? 
+                                '✓ Switched to Piano Only' : 
+                                '✓ Switched to Multi-instrument';
+                            statusText.style.color = '#64c896';
+                            
+                            if (loadSamplesBtn) {
+                                loadSamplesBtn.textContent = '✓ Loaded';
+                            }
+                        } catch (error) {
+                            console.error('Error reloading samples:', error);
+                            statusText.textContent = '✗ Error loading samples';
+                            statusText.style.color = '#ff6464';
+                            
+                            if (loadSamplesBtn) {
+                                loadSamplesBtn.textContent = '✗ Error';
+                            }
+                        }
+                        
+                        // Восстанавливаем кнопку через 2 секунды
+                        setTimeout(() => {
+                            statusText.textContent = oldText;
+                            statusText.style.color = '';
+                            
+                            if (loadSamplesBtn) {
+                                loadSamplesBtn.textContent = '📥 Load Audio Samples';
+                                loadSamplesBtn.disabled = false;
+                            }
+                        }, 2000);
+                        
+                        this.updateAudioEngineStatus();
+                    } else if (this.app.midiData) {
+                        // Если Audio Engine выключен, просто показываем сообщение
+                        const statusText = document.getElementById('status-text');
+                        const oldText = statusText.textContent;
+                        
+                        statusText.textContent = 'Enable Audio Engine to use this setting';
+                        statusText.style.color = '#ffc864';
+                        
+                        setTimeout(() => {
+                            statusText.textContent = oldText;
+                            statusText.style.color = '';
+                        }, 2000);
+                    }
+                });
         }
         
         if (volumeSlider && volumeValue) {
@@ -729,7 +802,8 @@ class Controls {
         if (statusText) {
             let text = 'Not initialized';
             if (status.initialized) {
-                text = status.enabled ? `✓ Active (${status.state})` : 'Initialized but disabled';
+                const mode = this.app.audioEngineUsePianoOnly ? ' (Piano Only)' : '';
+                text = status.enabled ? `✓ Active${mode} (${status.state})` : 'Initialized but disabled';
             }
             if (status.loading) {
                 text = 'Loading samples...';
@@ -739,7 +813,12 @@ class Controls {
         }
         
         if (samplesLoaded) {
-            samplesLoaded.textContent = status.samplesLoaded;
+            // Показываем количество сэмплов и каналов
+            if (status.channels > 0) {
+                samplesLoaded.textContent = `${status.samplesLoaded} (${status.channels} channels)`;
+            } else {
+                samplesLoaded.textContent = status.samplesLoaded;
+            }
         }
         
         if (activeSounds) {
@@ -759,6 +838,11 @@ class Controls {
         const audioSettings = document.getElementById('audio-engine-settings');
         if (audioSettings) {
             audioSettings.style.display = this.app.useAudioEngine ? 'block' : 'none';
+        }
+
+        const pianoOnlyCb = document.getElementById('audio-piano-only');
+        if (pianoOnlyCb) {
+            pianoOnlyCb.checked = this.app.audioEngineUsePianoOnly;
         }
         
         const volumeSlider = document.getElementById('audio-volume');
