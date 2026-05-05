@@ -662,6 +662,7 @@ class Controls {
         const loadSamplesBtn = document.getElementById('btn-load-audio-samples');
         const audioSettings = document.getElementById('audio-engine-settings');
         const pianoOnlyCb = document.getElementById('audio-piano-only'); 
+        const showDetailsBtn = document.getElementById('btn-show-audio-details');
         
         if (enableCb) {
             enableCb.addEventListener('change', async () => {
@@ -784,6 +785,12 @@ class Controls {
             });
         }
         
+        if (showDetailsBtn) {
+            showDetailsBtn.addEventListener('click', () => {
+                this.showAudioDetailsModal();
+            });
+        }
+
         // Обновляем статус каждую секунду когда модал открыт
         setInterval(() => {
             if (document.getElementById('settings-modal').classList.contains('active')) {
@@ -798,6 +805,7 @@ class Controls {
         const statusText = document.getElementById('audio-status-text');
         const samplesLoaded = document.getElementById('audio-samples-loaded');
         const activeSounds = document.getElementById('audio-active-sounds');
+        const memoryUsage = document.getElementById('audio-memory-usage');
         
         if (statusText) {
             let text = 'Not initialized';
@@ -824,6 +832,25 @@ class Controls {
         if (activeSounds) {
             activeSounds.textContent = status.activeSounds;
         }
+
+        // Отображение размера загруженных сэмплов
+        if (memoryUsage) {
+            if (status.totalBytes > 0) {
+                memoryUsage.textContent = status.sizeFormatted;
+                
+                // Меняем цвет в зависимости от размера
+                if (status.totalBytes > 100 * 1024 * 1024) { // > 100 MB
+                    memoryUsage.style.color = '#ff6464';
+                } else if (status.totalBytes > 50 * 1024 * 1024) { // > 50 MB
+                    memoryUsage.style.color = '#ffc864';
+                } else {
+                    memoryUsage.style.color = '#64c896';
+                }
+            } else {
+                memoryUsage.textContent = '0 MB';
+                memoryUsage.style.color = '#a0a8b8';
+            }
+        }        
     }
 
     showSettingsModal() {
@@ -857,6 +884,70 @@ class Controls {
         this.updateMIDIDevicesUI();
         this.updateSettingsButtons();
         
+        modal.classList.add('active');
+    }
+
+
+    showAudioDetailsModal() {
+        const sizeInfo = this.app.audioEngine.getSizeInfo();
+        
+        let detailsHTML = `
+            <h3>Audio Samples Details</h3>
+            <div style="margin: 15px 0;">
+                <strong>Total Size:</strong> ${(sizeInfo.totalMB).toFixed(2)} MB (${sizeInfo.totalBytes.toLocaleString()} bytes)<br>
+                <strong>Total Samples:</strong> ${sizeInfo.sampleCount}<br>
+                <strong>Average Sample Size:</strong> ${(sizeInfo.averageSampleSize / 1024).toFixed(1)} KB<br>
+            </div>
+            <h4>Size by Channel:</h4>
+            <div style="max-height: 300px; overflow-y: auto;">
+        `;
+        
+        const sortedChannels = Array.from(sizeInfo.channelSizes.entries())
+            .sort((a, b) => b[1] - a[1]); // Сортируем по размеру (больше -> меньше)
+        
+        sortedChannels.forEach(([channel, bytes]) => {
+            const mb = (bytes / (1024 * 1024)).toFixed(2);
+            const channelSettings = this.app.channelSettings.get(channel);
+            const folder = this.app.audioEngine.channelFolders.get(channel) || 'unknown';
+            const samplesCount = Array.from(this.app.audioEngine.sampleSizes.keys())
+                .filter(key => key.startsWith(`${channel}_`)).length;
+            
+            detailsHTML += `
+                <div style="padding: 8px; margin: 5px 0; background: rgba(255,255,255,0.05); border-radius: 4px;">
+                    <strong>Channel ${channel}</strong> (${folder}): ${mb} MB
+                    <span style="color: #a0a8b8; font-size: 12px;">(${samplesCount} samples)</span>
+                </div>
+            `;
+        });
+        
+        detailsHTML += '</div>';
+        
+        // Создаем или обновляем модальное окно
+        let modal = document.getElementById('audio-details-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'audio-details-modal';
+            modal.className = 'modal';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 600px;">
+                    <span class="close-btn">&times;</span>
+                    <div id="audio-details-content"></div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            modal.querySelector('.close-btn').addEventListener('click', () => {
+                modal.classList.remove('active');
+            });
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        }
+        
+        document.getElementById('audio-details-content').innerHTML = detailsHTML;
         modal.classList.add('active');
     }
 }

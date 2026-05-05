@@ -1424,7 +1424,10 @@ class SynthesiaApp {
         }
         
         statusText.textContent = oldText;
+        const sizeInfo = this.audioEngine.getSizeInfo();
         console.log(`✓ Audio samples loaded for all channels`);
+        console.log(`📊 Total size: ${sizeInfo.totalMB.toFixed(2)} MB (${sizeInfo.sampleCount} samples)`);
+        console.log(`📊 Average sample size: ${(sizeInfo.averageSampleSize / 1024).toFixed(1)} KB`);
     }
   }
 

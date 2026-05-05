@@ -15,6 +15,9 @@ class AudioEngine {
         this.minNote = 0;
         this.maxNote = 127;
         this.usePianoOnly = false;
+        
+        this.totalBytesLoaded = 0; // Отслеживание размера загруженных сэмплов
+        this.sampleSizes = new Map(); // Хранит размер каждого сэмпла
     }
     
     async initialize() {
@@ -136,6 +139,10 @@ class AudioEngine {
             // Очищаем все загруженные сэмплы при переключении
             this.channelSamples.clear();
             this.channelFolders.clear();
+
+            // Сбрасываем счетчики размера
+            this.sampleSizes.clear();
+            this.totalBytesLoaded = 0;
             console.log('Cleared all loaded samples due to mode change');
         }
         
@@ -165,6 +172,12 @@ class AudioEngine {
             }
             
             const arrayBuffer = await response.arrayBuffer();
+            // Отслеживаем размер
+            const sampleSize = arrayBuffer.byteLength;
+            const sampleKey = `${channel}_${note}`;
+            this.sampleSizes.set(sampleKey, sampleSize);
+            this.totalBytesLoaded += sampleSize;
+
             const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
             
             channelMap.set(note, audioBuffer);
@@ -365,7 +378,48 @@ class AudioEngine {
         
         console.log(`Audio Engine ${enabled ? 'enabled' : 'disabled'}`);
     }
+
+    // Метод для получения размера в читаемом формате
+    getLoadedSizeFormatted() {
+        const bytes = this.totalBytesLoaded;
+        
+        if (bytes === 0) return '0 MB';
+        
+        const mb = bytes / (1024 * 1024);
+        
+        if (mb < 0.1) {
+            const kb = bytes / 1024;
+            return `${kb.toFixed(1)} KB`;
+        }
+        
+        return `${mb.toFixed(2)} MB`;
+    }
     
+    // Метод для получения детальной информации о размере
+    getSizeInfo() {
+        const channelSizes = new Map();
+        
+        this.sampleSizes.forEach((size, key) => {
+            const [channel] = key.split('_');
+            const channelNum = parseInt(channel);
+            
+            if (!channelSizes.has(channelNum)) {
+                channelSizes.set(channelNum, 0);
+            }
+            
+            channelSizes.set(channelNum, channelSizes.get(channelNum) + size);
+        });
+        
+        return {
+            totalBytes: this.totalBytesLoaded,
+            totalMB: this.totalBytesLoaded / (1024 * 1024),
+            channelSizes: channelSizes,
+            sampleCount: this.sampleSizes.size,
+            averageSampleSize: this.sampleSizes.size > 0 ? 
+                this.totalBytesLoaded / this.sampleSizes.size : 0
+        };
+    }
+
     getStatus() {
         let totalSamples = 0;
         this.channelSamples.forEach(channelMap => {
@@ -380,7 +434,9 @@ class AudioEngine {
             channels: this.channelSamples.size,
             activeSounds: this.activeSounds.size,
             volume: this.volume,
-            state: this.context?.state
+            state: this.context?.state,
+            totalBytes: this.totalBytesLoaded,
+            sizeFormatted: this.getLoadedSizeFormatted()
         };
     }
 }
