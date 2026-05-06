@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import List, Dict, Any
 import asyncio
 from collections import defaultdict
+from pydantic import BaseModel
 
 app = FastAPI(title="MIDI Parser API")
 app.add_middleware(
@@ -262,38 +263,72 @@ async def upload_file(file: UploadFile = File(...)):
     
     return result
 
-@app.get("/api/audio/piano/{note:int}.mp3", response_model=Dict[str, Any])
-async def get_piano_sample(note: int):
-    """Get piano audio sample for a specific note"""
-    if note < 21 or note > 108:
-        raise HTTPException(status_code=400, detail="Invalid note number")
+class ChannelInfo(BaseModel):
+    program: int = 0
+    bank: int = 0
     
-    filepath = os.path.join(AUDIO_FOLDER, f'{note}.mp3')
+class ChannelsData(BaseModel):
+    channels: Dict[str, ChannelInfo]
+
+
+@app.get("/api/audio/{sample_path:path}", response_model=Dict[str, Any])
+#@app.get('/api/audio/{sample_path:path}')
+async def get_audio_sample(sample_path: str):
+    """Get audio sample for a specific note and instrument"""
+    # sample_path будет в формате: "piano/60.mp3" или "drums/36.mp3"
+    print(sample_path)
+    filepath = os.path.join('./audio', sample_path)
     
     if os.path.exists(filepath):
         return FileResponse(filepath, media_type='audio/mpeg')
     else:
-        # Возвращаем пустой звук если файл не найден
-        raise HTTPException(status_code=404, detail="Sample not found")
-
-@app.get("/api/audio/check", response_model=Dict[str, Any])
-async def check_audio_samples():
-    """Check which audio samples are available"""
-    available = []
+        raise HTTPException(status_code=401, detail="Sample not found")
     
-    if os.path.exists(AUDIO_FOLDER):
-        for note in range(21, 109):  # A0 to C8
-            filepath = os.path.join(AUDIO_FOLDER, f'{note}.mp3')
-            if os.path.exists(filepath):
-                available.append(note)
+@app.post('/api/audio/check')
+async def check_audio_samples_for_channels(data: ChannelsData):
+    """Check which audio samples are available for specific channels"""
+    channels_info = data.channels
     
+    result = {}
+    
+    for channel_str, info in channels_info.items():
+        channel = int(channel_str)
+        program = info.program
+        bank = info.bank
+        
+        # Определяем папку для поиска сэмплов
+        if bank == 128 or channel == 9:
+            # Ударные
+            folder_name = 'drums'
+        else:
+            # Мелодические инструменты - по номеру программы
+            folder_name = f'{program}'
+            
+            # Если папки для программы нет, пробуем дефолтную
+            folder_path = os.path.join('./audio', folder_name)
+            if not os.path.exists(folder_path):
+                folder_name = 'piano'  # Fallback на пианино
+            
+        folder_path = os.path.join('./audio', folder_name)
+        available = []
+  
+        if os.path.exists(folder_path):
+            for note in range(0, 128):
+                filepath = os.path.join(folder_path, f'{note}.mp3')
+                if os.path.exists(filepath):
+                    available.append(note)
+                
+        result[channel] = {
+            'folder': folder_name,
+            'available': available,
+            'total': len(available)
+        }
+        
     return {
         'success': True,
-        'available': available,
-        'total': len(available),
-        'min_note': min(available) if available else None,
-        'max_note': max(available) if available else None
+        'channels': result
     }
+
 
 @app.get("/api/devices", response_model=Dict[str, Any])
 async def get_devices():

@@ -191,16 +191,43 @@ class NotesRenderer {
     }
     
     resize() {
+        if (!this.canvas) return;
+        
         const container = this.canvas.parentElement;
         if (!container) return;
         
-        // Canvas должен занимать все доступное пространство своего контейнера
-        const rect = container.getBoundingClientRect();
-        this.canvas.width = rect.width || 1280;
-        this.canvas.height = rect.height || 600;
+        const containerWidth = container.clientWidth;
+        const containerHeight = container.clientHeight;
         
+        // Проверяем нужен ли вообще ресайз
+        if (this.canvas.width === containerWidth && this.canvas.height === containerHeight) {
+            return; // Размер не изменился, ничего не делаем
+        }
+        
+        console.log(`NotesRenderer resize: ${this.canvas.width}x${this.canvas.height} -> ${containerWidth}x${containerHeight}`);
+        
+        // Сохраняем текущее время для перерисовки
+        const currentRenderTime = this.lastRenderTime || 0;
+        
+        // Устанавливаем размер canvas
+        // Важно! сначала устанавливаем width/height атрибуты, это очищает canvas
+        this.canvas.width = containerWidth;
+        this.canvas.height = containerHeight;
+        
+        // Пересоздаем контекст после ресайза
+        this.ctx = this.canvas.getContext('2d', {
+            alpha: false,
+            desynchronized: true
+        });
+        
+        // Обновляем линию проигрывания
         this.updatePlayLinePosition();
         
-        console.log(`Canvas resized: ${this.canvas.width}x${this.canvas.height}, play line at: ${this.playLineY}`);
+        // Перерисовываем текущее состояние
+        if (this.notes && this.notes.length > 0) {
+            this.render(currentRenderTime);
+        }
+        
+        console.log('NotesRenderer resized successfully');
     }
 }
