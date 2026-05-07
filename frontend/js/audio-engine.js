@@ -18,6 +18,9 @@ class AudioEngine {
         
         this.totalBytesLoaded = 0; // Отслеживание размера загруженных сэмплов
         this.sampleSizes = new Map(); // Хранит размер каждого сэмпла
+        
+        // Параметры для fade-out
+        this.fadeOutTime = 0.15; // 50ms - плавное затухание
     }
     
     async initialize() {
@@ -129,6 +132,7 @@ class AudioEngine {
         
         return {};
     }
+    
     setPianoOnly(enabled) {
         const wasChanged = this.usePianoOnly !== enabled;
         this.usePianoOnly = enabled;
@@ -289,7 +293,8 @@ class AudioEngine {
                 gain: gainNode,
                 note: note,
                 channel: channel,
-                startTime: this.context.currentTime
+                startTime: this.context.currentTime,
+                stopping: false // Флаг для предотвращения двойной остановки
             });
             
             source.onended = () => {
@@ -316,17 +321,34 @@ class AudioEngine {
         
         if (soundId) {
             const sound = this.activeSounds.get(soundId);
-            if (sound) {
+            if (sound && !sound.stopping) {
                 try {
-                    const fadeTime = 1.0;
-                    sound.gain.gain.exponentialRampToValueAtTime(
-                        0.001,
-                        this.context.currentTime + fadeTime
-                    );
-                    sound.source.stop(this.context.currentTime + fadeTime);
-                    this.activeSounds.delete(soundId);
+                    sound.stopping = true;
+                    
+                    const now = this.context.currentTime;
+                    const fadeTime = this.fadeOutTime;
+                    
+                    // Отменяем все предыдущие автоматизации
+                    sound.gain.gain.cancelScheduledValues(now);
+                    
+                    // Устанавливаем текущее значение
+                    sound.gain.gain.setValueAtTime(sound.gain.gain.value, now);
+                    
+                    // Плавное затухание до очень малого значения (не до 0, чтобы избежать ошибок)
+                    sound.gain.gain.linearRampToValueAtTime(0.0001, now + fadeTime);
+                    
+                    // Останавливаем источник после затухания
+                    sound.source.stop(now + fadeTime + 0.01);
+                    
+                    // Удаляем из активных звуков с небольшой задержкой
+                    setTimeout(() => {
+                        this.activeSounds.delete(soundId);
+                    }, (fadeTime + 0.02) * 1000);
+                    
                 } catch (error) {
+                    // Если произошла ошибка, просто удаляем звук
                     console.warn('Error stopping sound:', error);
+                    this.activeSounds.delete(soundId);
                 }
             }
         } else {
@@ -345,20 +367,36 @@ class AudioEngine {
     stopAllNotes() {
         console.log(`Stopping ${this.activeSounds.size} active sounds...`);
         
+        const now = this.context ? this.context.currentTime : 0;
+        const fadeTime = this.fadeOutTime;
+        
         this.activeSounds.forEach((sound, id) => {
-            try {
-                const fadeTime = 0.02;
-                sound.gain.gain.exponentialRampToValueAtTime(
-                    0.001,
-                    this.context.currentTime + fadeTime
-                );
-                sound.source.stop(this.context.currentTime + fadeTime);
-            } catch (error) {
-                // Ignore
+            if (!sound.stopping) {
+                try {
+                    sound.stopping = true;
+                    
+                    // Отменяем все предыдущие автоматизации
+                    sound.gain.gain.cancelScheduledValues(now);
+                    
+                    // Устанавливаем текущее значение
+                    sound.gain.gain.setValueAtTime(sound.gain.gain.value, now);
+                    
+                    // Плавное затухание
+                    sound.gain.gain.linearRampToValueAtTime(0.0001, now + fadeTime);
+                    
+                    // Останавливаем источник
+                    sound.source.stop(now + fadeTime + 0.01);
+                    
+                } catch (error) {
+                    // Ignore errors when stopping
+                }
             }
         });
         
-        this.activeSounds.clear();
+        // Очищаем все звуки после завершения fade-out
+        setTimeout(() => {
+            this.activeSounds.clear();
+        }, (fadeTime + 0.02) * 1000);
     }
     
     setVolume(volume) {
